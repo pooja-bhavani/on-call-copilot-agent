@@ -1,0 +1,59 @@
+name: npm_stats
+version: 0.1.0
+dsl_version: 3
+backend: http
+description: >-
+  Query npm package download statistics from the npm downloads API.
+  No authentication required.
+
+base_url: https://api.npmjs.org
+
+test_queries:
+  - SELECT * FROM npm_stats.downloads WHERE package_name = 'express' LIMIT 1
+
+tables:
+  - name: downloads
+    description: >-
+      Monthly download count for a specific npm package over the last month.
+      Requires package_name filter.
+    guide: |
+      Get total downloads for a package over the last month.
+      Requires WHERE package_name = '<name>'.
+      Example: SELECT downloads FROM npm_stats.downloads WHERE package_name = 'express'
+    request:
+      method: GET
+      path: "/downloads/point/last-month/{{filter.package_name}}"
+    response:
+      allow_404_empty: true
+    filters:
+      - name: package_name
+        required: true
+    columns:
+      - name: package_name
+        type: Utf8
+        nullable: false
+        description: Package name (required filter)
+        expr:
+          kind: from_filter
+          key: package_name
+      - name: downloads
+        type: Int64
+        nullable: true
+        description: Total downloads in the last month
+        expr:
+          kind: path
+          path: [downloads]
+      - name: start
+        type: Utf8
+        nullable: true
+        description: Start date of the period
+        expr:
+          kind: path
+          path: [start]
+      - name: end
+        type: Utf8
+        nullable: true
+        description: End date of the period
+        expr:
+          kind: path
+          path: [end]

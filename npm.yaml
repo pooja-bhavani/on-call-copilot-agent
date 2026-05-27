@@ -1,0 +1,237 @@
+name: npm
+version: 0.1.0
+dsl_version: 3
+backend: http
+description: >-
+  Query npm package metadata, download stats, and search results.
+  No authentication required — the npm registry is public.
+
+base_url: https://registry.npmjs.org
+
+test_queries:
+  - SELECT * FROM npm.package_info WHERE package_name = 'express' LIMIT 1
+  - SELECT name, version, description FROM npm.search WHERE q = 'coral sql' LIMIT 3
+
+tables:
+  - name: package_info
+    description: >-
+      Metadata for a specific npm package including version, description,
+      license, homepage, and repository link. Requires package_name filter.
+    guide: |
+      Look up details about a specific npm package.
+      Requires WHERE package_name = '<name>'.
+      Example: SELECT * FROM npm.package_info WHERE package_name = 'express'
+    request:
+      method: GET
+      path: "/{{filter.package_name}}/latest"
+    response:
+      allow_404_empty: true
+    filters:
+      - name: package_name
+        required: true
+    columns:
+      - name: package_name
+        type: Utf8
+        nullable: false
+        description: Package name (required filter)
+        expr:
+          kind: from_filter
+          key: package_name
+      - name: name
+        type: Utf8
+        nullable: true
+        description: Package name from registry
+        expr:
+          kind: path
+          path: [name]
+      - name: version
+        type: Utf8
+        nullable: true
+        description: Latest published version
+        expr:
+          kind: path
+          path: [version]
+      - name: description
+        type: Utf8
+        nullable: true
+        description: Package description
+        expr:
+          kind: path
+          path: [description]
+      - name: license
+        type: Utf8
+        nullable: true
+        description: Package license
+        expr:
+          kind: path
+          path: [license]
+      - name: homepage
+        type: Utf8
+        nullable: true
+        description: Package homepage URL
+        expr:
+          kind: path
+          path: [homepage]
+      - name: repository_url
+        type: Utf8
+        nullable: true
+        description: Source repository URL
+        expr:
+          kind: path
+          path: [repository, url]
+      - name: author_name
+        type: Utf8
+        nullable: true
+        description: Package author name
+        expr:
+          kind: path
+          path: [author, name]
+
+  - name: downloads_last_month
+    description: >-
+      Monthly download count for a specific npm package.
+      Requires package_name filter.
+    guide: |
+      Get total downloads for a package over the last month.
+      Requires WHERE package_name = '<name>'.
+      Example: SELECT downloads FROM npm.downloads_last_month WHERE package_name = 'express'
+    request:
+      method: GET
+      path: "/downloads/point/last-month/{{filter.package_name}}"
+    response:
+      allow_404_empty: true
+    filters:
+      - name: package_name
+        required: true
+    columns:
+      - name: package_name
+        type: Utf8
+        nullable: false
+        description: Package name (required filter)
+        expr:
+          kind: from_filter
+          key: package_name
+      - name: downloads
+        type: Int64
+        nullable: true
+        description: Total downloads in the last month
+        expr:
+          kind: path
+          path: [downloads]
+      - name: start
+        type: Utf8
+        nullable: true
+        description: Start date of the period
+        expr:
+          kind: path
+          path: [start]
+      - name: end
+        type: Utf8
+        nullable: true
+        description: End date of the period
+        expr:
+          kind: path
+          path: [end]
+
+  - name: search
+    description: >-
+      Search npm packages by keyword, author, or scope.
+      Requires q filter. Supports author:name and scope:name syntax.
+    guide: |
+      Search for npm packages. Requires WHERE q = '<query>'.
+      Use author:<username> to find packages by a specific author.
+      Example: SELECT name, version, description FROM npm.search WHERE q = 'author:sindresorhus'
+    request:
+      method: GET
+      path: "/-/v1/search"
+      query:
+        - name: text
+          from: filter
+          key: q
+        - name: size
+          from: literal
+          value: 20
+    response:
+      rows_path: [objects]
+    filters:
+      - name: q
+        required: true
+    columns:
+      - name: q
+        type: Utf8
+        nullable: true
+        description: Search query (virtual filter column)
+        expr:
+          kind: from_filter
+          key: q
+        virtual: true
+      - name: name
+        type: Utf8
+        nullable: false
+        description: Package name
+        expr:
+          kind: path
+          path: [package, name]
+      - name: version
+        type: Utf8
+        nullable: true
+        description: Latest version
+        expr:
+          kind: path
+          path: [package, version]
+      - name: description
+        type: Utf8
+        nullable: true
+        description: Package description
+        expr:
+          kind: path
+          path: [package, description]
+      - name: author_username
+        type: Utf8
+        nullable: true
+        description: Publisher username
+        expr:
+          kind: path
+          path: [package, publisher, username]
+      - name: license
+        type: Utf8
+        nullable: true
+        description: Package license
+        expr:
+          kind: path
+          path: [package, license]
+      - name: date
+        type: Utf8
+        nullable: true
+        description: Last publish date
+        expr:
+          kind: path
+          path: [package, date]
+      - name: npm_url
+        type: Utf8
+        nullable: true
+        description: URL to the package on npmjs.com
+        expr:
+          kind: path
+          path: [package, links, npm]
+      - name: repository_url
+        type: Utf8
+        nullable: true
+        description: Source repository URL
+        expr:
+          kind: path
+          path: [package, links, repository]
+      - name: downloads_monthly
+        type: Int64
+        nullable: true
+        description: Monthly download count
+        expr:
+          kind: path
+          path: [downloads, monthly]
+      - name: score_final
+        type: Float64
+        nullable: true
+        description: Overall npm search score
+        expr:
+          kind: path
+          path: [score, final]
